@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🍽️ Food Nutrition Analyzer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin-top: 20px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      background-color: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    #preview {
+      max-width: 100%;
+      margin-top: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    #result {
+      margin-top: 25px;
+      padding: 15px;
+      border-radius: 10px;
+      background: #f0f4f8;
+      font-size: 16px;
+    }
+
+    .error {
+      color: #d32f2f;
+      background-color: #fdecea;
+    }
+
+    .success {
+      color: #2e7d32;
+      background-color: #eafaf1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🍽️ Food Nutrition Analyzer</h2>
+    <input type="file" id="fileInput" accept="image/*" />
+    <button onclick="uploadImage()">Analyze</button>
+
+    <img id="preview" src="" alt="Image Preview" style="display:none;" />
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function uploadImage() {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+      const result = document.getElementById("result");
+      const preview = document.getElementById("preview");
+
+      if (!file) {
+        alert("Please select an image.");
+        return;
+      }
+
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        preview.src = reader.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+
+      result.className = "";
+      result.innerHTML = "⏳ Analyzing image...";
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      fetch("http://127.0.0.1:9000/analyze", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          result.className = "error";
+          result.innerHTML = `<strong>Error:</strong> ${data.error}`;
+        } else {
+          result.className = "success";
+          result.innerHTML = `
+            <h3>✅ Prediction for: ${data.filename}</h3>
+            <ul>
+              <li><strong>Calories:</strong> ${data.calories} kcal</li>
+              <li><strong>Protein:</strong> ${data.protein} g</li>
+              <li><strong>Carbs:</strong> ${data.carbs} g</li>
+              <li><strong>Fats:</strong> ${data.fats} g</li>
+            </ul>
+            ${data.warning ? `<p style="color: #e65100;"><strong>⚠️ ${data.warning}</strong></p>` : ''}
+          `;
+        }
+      })
+      .catch(error => {
+        result.className = "error";
+        result.innerHTML = `<strong>Request Failed:</strong> ${error}`;
+      });
+    }
+  </script>
+</body>
+</html>
