@@ -1,86 +1,122 @@
+import os
+import json
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import tensorflow as tf
-import numpy as np
-import json
 
+# ========== FastAPI App ==========
 app = FastAPI()
 
-# CORS settings (allow all origins)
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allow all origins for dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load your trained model once when the app starts
-model = tf.keras.models.load_model("final_nutrition_model_resnet50.h5")
-
-# Load mean and std for label denormalization
-with open("label_mean_std.json", "r") as f:
-    mean_std_data = json.load(f)
-    label_mean = np.array(mean_std_data["mean"])
-    label_std = np.array(mean_std_data["std"])
-
+# ========== Config ==========
 img_height, img_width = 512, 512
+csv_path = "nutrition_db.csv"
+model_path = "final_nutrition_model.keras"
 
-def tf_preprocess_image(image_bytes):
-    """Decode, resize, normalize and batch the image tensor."""
-    img = tf.io.decode_jpeg(image_bytes, channels=3)
-    img = tf.image.resize(img, [img_height, img_width])
-    img = tf.image.convert_image_dtype(img, tf.float32)  # scale to [0,1]
-    img = tf.expand_dims(img, axis=0)  # batch dimension
-    return img
+# ========== Load Model and Normalization Stats ==========
+try:
+    model = tf.keras.models.load_model(model_path)
+    with open("label_mean_std.json", "r") as f:
+        stats = json.load(f)
+        label_mean = np.array(stats["mean"])
+        label_std = np.array(stats["std"])
+    print("✅ Model and normalization stats loaded.")
+except Exception as e:
+    print(f"❌ Failed to load model or stats: {e}")
+    raise RuntimeError("Model or label_mean_std.json missing.")
 
+# ========== Load Original CSV ==========
+try:
+    ground_truth_df = pd.read_csv(csv_path)
+    ground_truth_df["filename"] = ground_truth_df["filename"].apply(lambda x: os.path.basename(x))
+    print("✅ Ground truth CSV loaded.")
+except Exception as e:
+    print(f"❌ Failed to load nutrition_db.csv: {e}")
+    raise RuntimeError("nutrition_db.csv is missing or malformed.")
+
+# ========== Preprocessing Function ==========
+def tf_preprocess_image(image_bytes: bytes):
+    try:
+        img = tf.io.decode_jpeg(image_bytes, channels=3)
+        img = tf.image.resize(img, [img_height, img_width])
+        img = tf.image.convert_image_dtype(img, tf.float32)
+        img = tf.expand_dims(img, axis=0)
+        return img
+    except Exception as e:
+        raise ValueError(f"Image preprocessing failed: {e}")
+
+# ========== Health Check ==========
 @app.get("/")
-def home():
-    return {"message": "FastAPI nutrition model API running on port 9000."}
+def root():
+    return {"message": "✅ Nutrition model API is running on port 9000."}
 
+# ========== Analyze Endpoint ==========
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
-        return JSONResponse(status_code=400, content={"error": "Invalid file type. Please upload an image."})
+        return JSONResponse(status_code=400, content={"error": "Upload a valid image file."})
 
     try:
         contents = await file.read()
-        if len(contents) < 100:  # very small image check
-            return JSONResponse(status_code=400, content={"error": "Image file is too small or empty."})
+        if len(contents) < 100:
+            return JSONResponse(status_code=400, content={"error": "Image is too small or empty."})
 
         img_tensor = tf_preprocess_image(contents)
+
         pred_standardized = model.predict(img_tensor)[0]
-
-        # Denormalize predictions
         pred_real = (pred_standardized * label_std) + label_mean
-        calories, protein, carbs, fats = map(lambda x: round(x, 2), pred_real.tolist())
 
+        # Extract values and round
+        calories_pred, protein_pred, carbs_pred, fats_pred = map(lambda x: round(x, 2), pred_real.tolist())
 
-        # Calculate calories using Atwater factors
-        calories = round(carbs * 4 + fats * 9 + protein * 4, 2)
+        # Match filename with original CSV values
+        filename_only = os.path.basename(file.filename)
+        match = ground_truth_df[ground_truth_df["filename"] == filename_only]
 
-        # Basic heuristic for empty or non-food detection
-        if calories < 10 and (carbs + fats + protein < 1):
-            return JSONResponse(status_code=200, content={
-                "carbs": carbs,
-                "fats": fats,
-                "protein": protein,
-                "calories": calories,
-                "filename": file.filename,
-                "warning": "Low nutritional values detected. Might be empty plate or non-food item."
-            })
+        if not match.empty:
+            row = match.iloc[0]
+            original_values = {
+                "calories_true": float(row["calories"]),
+                "protein_true": float(row["protein"]),
+                "carbs_true": float(row["carbs"]),
+                "fats_true": float(row["fats"]),
+            }
+        else:
+            original_values = {"note": "Original values not found in CSV."}
 
-        return JSONResponse(content={
-    "calories": calories,
-    "protein": protein,
-    "carbs": carbs,
-    "fats": fats,
-    "filename": file.filename
-})
+        result = {
+            "filename": filename_only,
+            "calories_pred": max(0.0, calories_pred),
+            "protein_pred": max(0.0, protein_pred),
+            "carbs_pred": max(0.0, carbs_pred),
+            "fats_pred": max(0.0, fats_pred),
 
+            # Add these for compatibility with frontend
+    "calories": max(0.0, calories_pred),
+    "protein": max(0.0, protein_pred),
+    "carbs": max(0.0, carbs_pred),
+    "fats": max(0.0, fats_pred),
 
-    except tf.errors.InvalidArgumentError as tf_err:
-        return JSONResponse(status_code=400, content={"error": f"Image processing failed: {tf_err}. Ensure it's a valid JPEG."})
+        }
+        result.update(original_values)
+
+        return JSONResponse(content=result)
+
+    except ValueError as ve:
+        return JSONResponse(status_code=400, content={"error": str(ve)})
+    except tf.errors.ResourceExhaustedError:
+        return JSONResponse(status_code=507, content={"error": "Server out of memory. Try smaller image."})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Unexpected error: {e}"})
+        print(f"❌ Unexpected error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error."})
