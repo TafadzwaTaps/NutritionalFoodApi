@@ -20,14 +20,18 @@ app.add_middleware(
 )
 
 # ========== Config ==========
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 img_height, img_width = 512, 512
-csv_path = "nutrition_db.csv"
-model_path = "final_nutrition_model.keras"
+model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
+label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
+csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # ========== Load Model and Normalization Stats ==========
 try:
+    print(f"Trying to load model from: {model_path} (Exists: {os.path.exists(model_path)})")
     model = tf.keras.models.load_model(model_path)
-    with open("label_mean_std.json", "r") as f:
+    print(f"Trying to load label stats from: {label_stats_path} (Exists: {os.path.exists(label_stats_path)})")
+    with open(label_stats_path, "r") as f:
         stats = json.load(f)
         label_mean = np.array(stats["mean"])
         label_std = np.array(stats["std"])
@@ -38,6 +42,7 @@ except Exception as e:
 
 # ========== Load Original CSV ==========
 try:
+    print(f"Trying to load CSV from: {csv_path} (Exists: {os.path.exists(csv_path)})")
     ground_truth_df = pd.read_csv(csv_path)
     ground_truth_df["filename"] = ground_truth_df["filename"].apply(lambda x: os.path.basename(x))
     print("✅ Ground truth CSV loaded.")
@@ -103,11 +108,10 @@ async def analyze(file: UploadFile = File(...)):
             "fats_pred": max(0.0, fats_pred),
 
             # Add these for compatibility with frontend
-    "calories": max(0.0, calories_pred),
-    "protein": max(0.0, protein_pred),
-    "carbs": max(0.0, carbs_pred),
-    "fats": max(0.0, fats_pred),
-
+            "calories": max(0.0, calories_pred),
+            "protein": max(0.0, protein_pred),
+            "carbs": max(0.0, carbs_pred),
+            "fats": max(0.0, fats_pred),
         }
         result.update(original_values)
 
