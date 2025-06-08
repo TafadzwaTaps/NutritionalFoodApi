@@ -19,14 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Working directory:", os.getcwd())
-print("Files in working directory:", os.listdir())
-
-# Get absolute paths based on current file location
-base_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(base_dir, "final_nutrition_model.keras")
-json_path = os.path.join(base_dir, "label_mean_std.json")
-csv_path = os.path.join(base_dir, "nutrition_db.csv")
+# ========== Config ==========
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+img_height, img_width = 512, 512
+model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
+label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
+csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # ========== Load Model and Normalization Stats ==========
 try:
