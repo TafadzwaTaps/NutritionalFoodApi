@@ -71,6 +71,10 @@
       color: #2e7d32;
       background-color: #eafaf1;
     }
+
+    h3, h4 {
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
@@ -85,11 +89,14 @@
   </div>
 
   <script>
-    function uploadImage() {
+    async function uploadImage() {
       const fileInput = document.getElementById("fileInput");
       const file = fileInput.files[0];
       const result = document.getElementById("result");
       const preview = document.getElementById("preview");
+
+      result.className = "";
+      result.innerHTML = "";
 
       if (!file) {
         alert("Please select an image.");
@@ -104,39 +111,49 @@
       };
       reader.readAsDataURL(file);
 
-      result.className = "";
       result.innerHTML = "⏳ Analyzing image...";
 
       const formData = new FormData();
       formData.append("file", file);
 
-      fetch("http://127.0.0.1:9000/analyze", {
-        method: "POST",
-        body: formData
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
+      try {
+        const response = await fetch("http://127.0.0.1:9000/analyze", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        console.log("🔍 API Response:", data);
+
+        if (!data || data.error || typeof data.calories === "undefined") {
           result.className = "error";
-          result.innerHTML = `<strong>Error:</strong> ${data.error}`;
-        } else {
-          result.className = "success";
-          result.innerHTML = `
-            <h3>✅ Prediction for: ${data.filename}</h3>
-            <ul>
-              <li><strong>Calories:</strong> ${data.calories} kcal</li>
-              <li><strong>Protein:</strong> ${data.protein} g</li>
-              <li><strong>Carbs:</strong> ${data.carbs} g</li>
-              <li><strong>Fats:</strong> ${data.fats} g</li>
-            </ul>
-            ${data.warning ? `<p style="color: #e65100;"><strong>⚠️ ${data.warning}</strong></p>` : ''}
-          `;
+          result.innerHTML = `<strong>Error:</strong> ${data.error || "Unexpected API response."}`;
+          return;
         }
-      })
-      .catch(error => {
+
+        result.className = "success";
+        result.innerHTML = `
+          <h3>✅ Prediction for: ${data.filename}</h3>
+          <ul>
+            <li><strong>Calories:</strong> ${data.calories} kcal</li>
+            <li><strong>Protein:</strong> ${data.protein} g</li>
+            <li><strong>Carbs:</strong> ${data.carbs} g</li>
+            <li><strong>Fats:</strong> ${data.fats} g</li>
+          </ul>
+          ${data.warning ? `<p style="color: #e65100;"><strong>⚠️ ${data.warning}</strong></p>` : ''}
+          ${typeof data.calories_true !== "undefined" ? `
+            <h4>📊 Ground Truth from CSV:</h4>
+            <ul>
+              <li><strong>Calories (True):</strong> ${data.calories_true} kcal</li>
+              <li><strong>Protein (True):</strong> ${data.protein_true} g</li>
+              <li><strong>Carbs (True):</strong> ${data.carbs_true} g</li>
+              <li><strong>Fats (True):</strong> ${data.fats_true} g</li>
+            </ul>` : ''}
+        `;
+      } catch (error) {
         result.className = "error";
-        result.innerHTML = `<strong>Request Failed:</strong> ${error}`;
-      });
+        result.innerHTML = `<strong>Request Failed:</strong> ${error.message}`;
+      }
     }
   </script>
 </body>

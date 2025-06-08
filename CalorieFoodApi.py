@@ -54,13 +54,13 @@ def augment(img, label):
     img = tf.image.random_flip_left_right(img)
     img = tf.image.random_brightness(img, 0.1)
     img = tf.image.random_contrast(img, 0.8, 1.2)
-    scale = 0.9
-    crop_h = tf.cast(img_height * scale, tf.int32)
-    crop_w = tf.cast(img_width * scale, tf.int32)
-    img = tf.image.random_crop(img, size=[crop_h, crop_w, 3])
+    img = tf.image.random_saturation(img, 0.8, 1.2)  # NEW
+    img = tf.image.random_hue(img, 0.05)             # NEW
+    img = tf.image.central_crop(img, central_fraction=0.9)  # Optional alternative to crop
     img = tf.image.resize(img, [img_height, img_width])
     img = tf.clip_by_value(img, 0.0, 1.0)
     return img, label
+
 
 # Shuffle & map
 full_ds = full_ds.shuffle(len(filepaths), seed=seed).map(decode_image, num_parallel_calls=AUTOTUNE)
@@ -110,8 +110,8 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-5), loss='huber', metrics=['
 model.fit(train_ds, validation_data=val_ds, epochs=epochs+20, initial_epoch=history.epoch[-1], callbacks=cb)
 
 # ========= Save Model =========
-model.save("final_nutrition_model_resnet50.h5")
-print("💾 Saved model: final_nutrition_model_resnet50.h5")
+model.save("final_nutrition_model.keras", save_format="keras")
+print("💾 Saved model: final_nutrition_model.keras")
 
 # ========= Evaluate & Export Predictions =========
 print("📊 Generating predictions...")
