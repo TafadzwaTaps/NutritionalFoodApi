@@ -2,6 +2,6 @@ fastapi
 uvicorn
 tensorflow==2.15.0
 numpy
-opencv-python
+pandas
+pillow
 python-multipart
-Pillow>=9.0.0
