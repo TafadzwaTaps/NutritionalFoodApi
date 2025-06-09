@@ -7,6 +7,21 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+# ========== Google Drive Fallback Downloader ==========
+def download_if_missing():
+    import gdown
+
+    MODEL_ID = "YOUR_MODEL_FILE_ID"  # <-- replace
+    LABELS_ID = "YOUR_LABELS_FILE_ID"  # <-- replace
+
+    if not os.path.exists("final_nutrition_model.keras"):
+        print("🔽 Downloading model from Google Drive...")
+        gdown.download("https://drive.google.com/uc?id=1nV845rx6NhZ5UOSzdtmI9qZY7L8UIDDR", "final_nutrition_model.keras", quiet=False)
+
+    if not os.path.exists("label_mean_std.json"):
+        print("🔽 Downloading label stats from Google Drive...")
+        gdown.download("https://drive.google.com/uc?id=1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si", "label_mean_std.json", quiet=False)
+
 # ========== FastAPI App ==========
 app = FastAPI()
 
@@ -25,6 +40,9 @@ img_height, img_width = 512, 512
 model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
+
+# ========== Ensure Required Files ==========
+download_if_missing()
 
 # ========== Load Model and Normalization Stats ==========
 try:
