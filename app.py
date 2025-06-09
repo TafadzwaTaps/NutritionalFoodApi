@@ -3,24 +3,10 @@ import json
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import gdown
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-# ========== Google Drive Fallback Downloader ==========
-def download_if_missing():
-    import gdown
-
-    MODEL_ID = "YOUR_MODEL_FILE_ID"  # <-- replace
-    LABELS_ID = "YOUR_LABELS_FILE_ID"  # <-- replace
-
-    if not os.path.exists("final_nutrition_model.keras"):
-        print("🔽 Downloading model from Google Drive...")
-        gdown.download("https://drive.google.com/uc?id=1nV845rx6NhZ5UOSzdtmI9qZY7L8UIDDR", "final_nutrition_model.keras", quiet=False)
-
-    if not os.path.exists("label_mean_std.json"):
-        print("🔽 Downloading label stats from Google Drive...")
-        gdown.download("https://drive.google.com/uc?id=1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si", "label_mean_std.json", quiet=False)
 
 # ========== FastAPI App ==========
 app = FastAPI()
@@ -28,7 +14,7 @@ app = FastAPI()
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for dev
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,13 +27,24 @@ model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
-# ========== Ensure Required Files ==========
-download_if_missing()
+# Google Drive fallback URLs
+GDRIVE_MODEL_ID = "1nV845rx6NhZ5UOSzdtmI9qZY7L8UIDDR"
+GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
+
+def download_file_if_missing(path, file_id):
+    if not os.path.exists(path):
+        print(f"📥 {path} not found, downloading from Google Drive...")
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, path, quiet=False)
 
 # ========== Load Model and Normalization Stats ==========
 try:
+    download_file_if_missing(model_path, GDRIVE_MODEL_ID)
+    download_file_if_missing(label_stats_path, GDRIVE_STATS_ID)
+
     print(f"Trying to load model from: {model_path} (Exists: {os.path.exists(model_path)})")
     model = tf.keras.models.load_model(model_path)
+
     print(f"Trying to load label stats from: {label_stats_path} (Exists: {os.path.exists(label_stats_path)})")
     with open(label_stats_path, "r") as f:
         stats = json.load(f)
@@ -57,6 +54,7 @@ try:
 except Exception as e:
     print(f"❌ Failed to load model or stats: {e}")
     raise RuntimeError("Model or label_mean_std.json missing.")
+
 
 # ========== Load Original CSV ==========
 try:
