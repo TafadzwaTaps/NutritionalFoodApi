@@ -27,15 +27,24 @@ model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
-# Google Drive fallback URLs
+# Google Drive file IDs
 GDRIVE_MODEL_ID = "1nV845rx6NhZ5UOSzdtmI9qZY7L8UIDDR"
 GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
 
+# ========== Safe File Downloader ==========
 def download_file_if_missing(path, file_id):
     if not os.path.exists(path):
         print(f"📥 {path} not found, downloading from Google Drive...")
         url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, path, quiet=False)
+        try:
+            output = gdown.download(url, path, quiet=False, fuzzy=True)
+            if output is None or not os.path.exists(path):
+                raise RuntimeError(f"❌ Failed to download: {path}")
+            else:
+                print(f"✅ Downloaded: {path}")
+        except Exception as e:
+            print(f"❌ gdown download failed for {path}: {e}")
+            raise RuntimeError(f"Download failed for {path}: {e}")
 
 # ========== Load Model and Normalization Stats ==========
 try:
@@ -54,7 +63,6 @@ try:
 except Exception as e:
     print(f"❌ Failed to load model or stats: {e}")
     raise RuntimeError("Model or label_mean_std.json missing.")
-
 
 # ========== Load Original CSV ==========
 try:
@@ -122,8 +130,7 @@ async def analyze(file: UploadFile = File(...)):
             "protein_pred": max(0.0, protein_pred),
             "carbs_pred": max(0.0, carbs_pred),
             "fats_pred": max(0.0, fats_pred),
-
-            # Add these for compatibility with frontend
+            # Add these for frontend compatibility
             "calories": max(0.0, calories_pred),
             "protein": max(0.0, protein_pred),
             "carbs": max(0.0, carbs_pred),
