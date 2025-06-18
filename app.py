@@ -35,7 +35,7 @@ GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
 def download_file_if_missing(path, file_id):
     if not os.path.exists(path):
         print(f"📥 {path} not found, downloading from Google Drive...")
-        url = f"https://drive.google.com/uc?id={file_id}"
+        url = f"https://drive.google.com/uc?id={file_id}&confirm=t"
         try:
             output = gdown.download(url, path, quiet=False, fuzzy=True)
             if output is None or not os.path.exists(path):
