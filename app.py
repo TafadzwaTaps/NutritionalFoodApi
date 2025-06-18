@@ -28,7 +28,7 @@ label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # Google Drive file IDs
-GDRIVE_MODEL_ID = "1jYLjX0o8Odt20NfyFcJ_AhqctpKCE0gV" # ✅ update this after uploading the tf.keras model to Drive
+GDRIVE_MODEL_ID = "1V8dqxers7VYh88e-bQ2DnUlNZ7JVpSQ9" # ✅ update this after uploading the tf.keras model to Drive
 GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
 
 # ========== Safe File Downloader ==========
