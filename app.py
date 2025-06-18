@@ -23,7 +23,7 @@ app.add_middleware(
 # ========== Config ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 img_height, img_width = 512, 512
-model_path = os.path.join(BASE_DIR, "final_nutrition_model_tf.keras")  # ✅ changed
+model_path = os.path.join(BASE_DIR, "final_nutrition_model.h5")  # ✅ changed
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
