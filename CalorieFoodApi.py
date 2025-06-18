@@ -88,7 +88,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-3), loss='huber', metrics=['
 cb = [
     callbacks.EarlyStopping(patience=8, restore_best_weights=True, monitor='val_loss'),
     callbacks.ReduceLROnPlateau(patience=4, factor=0.5, verbose=1, monitor='val_loss'),
-    callbacks.ModelCheckpoint('best_model_resnet50.h5', save_best_only=True, monitor='val_loss', verbose=1)
+    callbacks.ModelCheckpoint('best_model_resnet50.keras', save_best_only=True, monitor='val_loss', verbose=1)
 ]
 
 # ========= Train =========
@@ -110,8 +110,8 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-5), loss='huber', metrics=['
 model.fit(train_ds, validation_data=val_ds, epochs=epochs+20, initial_epoch=history.epoch[-1], callbacks=cb)
 
 # ========= Save Model =========
-model.save("final_nutrition_model.keras", save_format="keras")
-print("💾 Saved model: final_nutrition_model.keras")
+model.save("final_nutrition_model_tf.keras", save_format="keras")
+print("💾 Saved model: final_nutrition_model_tf.keras")
 
 # ========= Evaluate & Export Predictions =========
 print("📊 Generating predictions...")

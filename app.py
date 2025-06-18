@@ -23,12 +23,12 @@ app.add_middleware(
 # ========== Config ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 img_height, img_width = 512, 512
-model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
+model_path = os.path.join(BASE_DIR, "final_nutrition_model_tf.keras")  # ✅ changed
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # Google Drive file IDs
-GDRIVE_MODEL_ID = "1nV845rx6NhZ5UOSzdtmI9qZY7L8UIDDR"
+GDRIVE_MODEL_ID = "1jYLjX0o8Odt20NfyFcJ_AhqctpKCE0gV" # ✅ update this after uploading the tf.keras model to Drive
 GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
 
 # ========== Safe File Downloader ==========
@@ -130,7 +130,6 @@ async def analyze(file: UploadFile = File(...)):
             "protein_pred": max(0.0, protein_pred),
             "carbs_pred": max(0.0, carbs_pred),
             "fats_pred": max(0.0, fats_pred),
-            # Add these for frontend compatibility
             "calories": max(0.0, calories_pred),
             "protein": max(0.0, protein_pred),
             "carbs": max(0.0, carbs_pred),
