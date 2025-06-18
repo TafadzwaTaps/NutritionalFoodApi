@@ -1,0 +1,3 @@
+# .gitignore
+*.keras
+*.h5
