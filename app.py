@@ -1,5 +1,6 @@
 import os
 import json
+import zipfile
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 print(f"TensorFlow version: {tf.__version__}")
 print(f"Keras version: {keras.__version__}")
+
 # ========== FastAPI App ==========
 app = FastAPI()
 
@@ -26,15 +28,18 @@ app.add_middleware(
 # ========== Config ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 img_height, img_width = 512, 512
-model_path = os.path.join(BASE_DIR, "final_nutrition_model.keras")
+
+# Model and data paths
+model_dir_path = os.path.join(BASE_DIR, "final_nutrition_model")  # Folder for SavedModel
+model_zip_path = os.path.join(BASE_DIR, "final_nutrition_model.zip")
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # Hugging Face URLs
-MODEL_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.keras"
+MODEL_ZIP_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.zip"
 STATS_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/label_mean_std.json"
 
-# ========== Safe Downloader ==========
+# ========== Safe Downloader and Unzipper ==========
 def download_file_if_missing(path, url):
     if not os.path.exists(path):
         print(f"📥 {path} not found, downloading from {url} ...")
@@ -49,13 +54,25 @@ def download_file_if_missing(path, url):
             print(f"❌ Failed to download {url}: {e}")
             raise RuntimeError(f"Download failed: {url}")
 
+def download_and_unzip_if_missing(folder_path, zip_url, zip_path):
+    if not os.path.exists(folder_path):
+        print(f"📦 {folder_path} not found, downloading and extracting ZIP...")
+        try:
+            download_file_if_missing(zip_path, zip_url)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(folder_path)
+            print(f"✅ Extracted model to: {folder_path}")
+        except Exception as e:
+            print(f"❌ Failed to download or unzip: {e}")
+            raise RuntimeError("Model download or unzip failed.")
+
 # ========== Load Model and Normalization Stats ==========
 try:
-    download_file_if_missing(model_path, MODEL_URL)
+    download_and_unzip_if_missing(model_dir_path, MODEL_ZIP_URL, model_zip_path)
     download_file_if_missing(label_stats_path, STATS_URL)
 
-    print(f"Trying to load model from: {model_path} (Exists: {os.path.exists(model_path)})")
-    model = tf.keras.models.load_model(model_path)
+    print(f"Trying to load model from: {model_dir_path} (Exists: {os.path.exists(model_dir_path)})")
+    model = tf.keras.models.load_model(model_dir_path)
 
     print(f"Trying to load label stats from: {label_stats_path} (Exists: {os.path.exists(label_stats_path)})")
     with open(label_stats_path, "r") as f:
@@ -109,10 +126,10 @@ async def analyze(file: UploadFile = File(...)):
         pred_standardized = model.predict(img_tensor)[0]
         pred_real = (pred_standardized * label_std) + label_mean
 
-        # Extract values and round
+        # Extract and round values
         calories_pred, protein_pred, carbs_pred, fats_pred = map(lambda x: round(x, 2), pred_real.tolist())
 
-        # Match filename with original CSV values
+        # Match with CSV
         filename_only = os.path.basename(file.filename)
         match = ground_truth_df[ground_truth_df["filename"] == filename_only]
 
