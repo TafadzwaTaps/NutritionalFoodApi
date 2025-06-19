@@ -1,95 +1,151 @@
 import os
-import io
 import json
-import zipfile
-import requests
 import numpy as np
-from PIL import Image
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from tensorflow.keras.models import load_model
+import pandas as pd
 import tensorflow as tf
+import requests
+import keras
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
+print(f"TensorFlow version: {tf.__version__}")
+print(f"Keras version: {keras.__version__}")
+# ========== FastAPI App ==========
 app = FastAPI()
 
-# Allow all CORS origins
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Constants
+# ========== Config ==========
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+img_height, img_width = 512, 512
+model_path = os.path.join(BASE_DIR, "final_nutrition_model.h5")
+label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
+csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
+
+# Hugging Face URLs
 MODEL_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.h5"
-MEAN_STD_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/label_mean_std.json"
-MODEL_PATH = "final_nutrition_model.h5"
-MEAN_STD_PATH = "label_mean_std.json"
-IMG_SIZE = (224, 224)
+STATS_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/label_mean_std.json"
 
-# Load model and stats
-model = None
-mean_std = None
+# ========== Safe Downloader ==========
+def download_file_if_missing(path, url):
+    if not os.path.exists(path):
+        print(f"📥 {path} not found, downloading from {url} ...")
+        try:
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                with open(path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            print(f"✅ Downloaded: {path}")
+        except Exception as e:
+            print(f"❌ Failed to download {url}: {e}")
+            raise RuntimeError(f"Download failed: {url}")
 
-def download_file(url, local_path):
-    print(f"📥 Downloading from: {url}")
-    response = requests.get(url)
-    response.raise_for_status()
-    with open(local_path, "wb") as f:
-        f.write(response.content)
-    print(f"✅ Downloaded: {local_path}")
+# ========== Load Model and Normalization Stats ==========
+try:
+    download_file_if_missing(model_path, MODEL_URL)
+    download_file_if_missing(label_stats_path, STATS_URL)
 
-def load_model_and_stats():
-    global model, mean_std
+    print(f"Trying to load model from: {model_path} (Exists: {os.path.exists(model_path)})")
+    model = tf.keras.models.load_model(model_path)
 
-    # Download model if not found
-    if not os.path.exists(MODEL_PATH):
-        print(f"📦 {MODEL_PATH} not found, downloading...")
-        download_file(MODEL_URL, MODEL_PATH)
+    print(f"Trying to load label stats from: {label_stats_path} (Exists: {os.path.exists(label_stats_path)})")
+    with open(label_stats_path, "r") as f:
+        stats = json.load(f)
+        label_mean = np.array(stats["mean"])
+        label_std = np.array(stats["std"])
+    print("✅ Model and normalization stats loaded.")
+except Exception as e:
+    print(f"❌ Failed to load model or stats: {e}")
+    raise RuntimeError("Model or label_mean_std.json missing.")
 
-    # Download mean/std JSON if not found
-    if not os.path.exists(MEAN_STD_PATH):
-        print(f"📦 {MEAN_STD_PATH} not found, downloading...")
-        download_file(MEAN_STD_URL, MEAN_STD_PATH)
+# ========== Load Original CSV ==========
+try:
+    print(f"Trying to load CSV from: {csv_path} (Exists: {os.path.exists(csv_path)})")
+    ground_truth_df = pd.read_csv(csv_path)
+    ground_truth_df["filename"] = ground_truth_df["filename"].apply(lambda x: os.path.basename(x))
+    print("✅ Ground truth CSV loaded.")
+except Exception as e:
+    print(f"❌ Failed to load nutrition_db.csv: {e}")
+    raise RuntimeError("nutrition_db.csv is missing or malformed.")
 
-    # Load model
-    print(f"🔍 Loading model from {MODEL_PATH} ...")
-    model = load_model(MODEL_PATH)
-    print("✅ Model loaded.")
+# ========== Preprocessing Function ==========
+def tf_preprocess_image(image_bytes: bytes):
+    try:
+        img = tf.io.decode_jpeg(image_bytes, channels=3)
+        img = tf.image.resize(img, [img_height, img_width])
+        img = tf.image.convert_image_dtype(img, tf.float32)
+        img = tf.expand_dims(img, axis=0)
+        return img
+    except Exception as e:
+        raise ValueError(f"Image preprocessing failed: {e}")
 
-    # Load mean/std
-    with open(MEAN_STD_PATH, "r") as f:
-        mean_std = json.load(f)
-    print("✅ Mean/Std loaded.")
+# ========== Health Check ==========
+@app.get("/")
+def root():
+    return {"message": "✅ Nutrition model API is running on port 9000."}
 
-@app.on_event("startup")
-def startup_event():
-    load_model_and_stats()
-
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    if model is None or mean_std is None:
-        raise HTTPException(status_code=500, detail="Model or mean/std not loaded.")
+# ========== Analyze Endpoint ==========
+@app.post("/analyze")
+async def analyze(file: UploadFile = File(...)):
+    if not file.content_type.startswith("image/"):
+        return JSONResponse(status_code=400, content={"error": "Upload a valid image file."})
 
     try:
-        # Read image
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        image = image.resize(IMG_SIZE)
-        img_array = np.array(image) / 255.0
-        img_tensor = np.expand_dims(img_array, axis=0)
+        if len(contents) < 100:
+            return JSONResponse(status_code=400, content={"error": "Image is too small or empty."})
 
-        # Predict
+        img_tensor = tf_preprocess_image(contents)
+
         pred_standardized = model.predict(img_tensor)[0]
+        pred_real = (pred_standardized * label_std) + label_mean
 
-        # Un-standardize
-        preds = {}
-        for i, key in enumerate(["calories", "protein", "carbs", "fats"]):
-            mean = mean_std[key]["mean"]
-            std = mean_std[key]["std"]
-            preds[key] = float((pred_standardized[i] * std) + mean)
+        # Extract values and round
+        calories_pred, protein_pred, carbs_pred, fats_pred = map(lambda x: round(x, 2), pred_real.tolist())
 
-        return {"predictions": preds}
+        # Match filename with original CSV values
+        filename_only = os.path.basename(file.filename)
+        match = ground_truth_df[ground_truth_df["filename"] == filename_only]
 
+        if not match.empty:
+            row = match.iloc[0]
+            original_values = {
+                "calories_true": float(row["calories"]),
+                "protein_true": float(row["protein"]),
+                "carbs_true": float(row["carbs"]),
+                "fats_true": float(row["fats"]),
+            }
+        else:
+            original_values = {"note": "Original values not found in CSV."}
+
+        result = {
+            "filename": filename_only,
+            "calories_pred": max(0.0, calories_pred),
+            "protein_pred": max(0.0, protein_pred),
+            "carbs_pred": max(0.0, carbs_pred),
+            "fats_pred": max(0.0, fats_pred),
+            "calories": max(0.0, calories_pred),
+            "protein": max(0.0, protein_pred),
+            "carbs": max(0.0, carbs_pred),
+            "fats": max(0.0, fats_pred),
+        }
+        result.update(original_values)
+
+        return JSONResponse(content=result)
+
+    except ValueError as ve:
+        return JSONResponse(status_code=400, content={"error": str(ve)})
+    except tf.errors.ResourceExhaustedError:
+        return JSONResponse(status_code=507, content={"error": "Server out of memory. Try smaller image."})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        print(f"❌ Unexpected error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error."})
