@@ -6,6 +6,7 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import layers, models, applications, callbacks, regularizers
 
+
 # ========= Config =========
 data_dir = r"C:\Users\manix\source\FoodApi\ImageData"
 csv_path = 'nutrition_db.csv'
@@ -110,8 +111,8 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-5), loss='huber', metrics=['
 model.fit(train_ds, validation_data=val_ds, epochs=epochs+20, initial_epoch=history.epoch[-1], callbacks=cb)
 
 # ========= Save Model =========
-model.save("final_nutrition_model.h5")  # HDF5 format
-print("💾 Saved model: final_nutrition_model.h5")
+model.save("final_nutrition_model.keras", save_format="keras")
+print("💾 Saved model: final_nutrition_model.keras")
 
 # ========= Evaluate & Export Predictions =========
 print("📊 Generating predictions...")
