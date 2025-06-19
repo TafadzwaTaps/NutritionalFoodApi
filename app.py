@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import gdown
+import requests
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,33 +23,33 @@ app.add_middleware(
 # ========== Config ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 img_height, img_width = 512, 512
-model_path = os.path.join(BASE_DIR, "final_nutrition_model.h5")  # ✅ changed
+model_path = os.path.join(BASE_DIR, "final_nutrition_model.h5")
 label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
-# Google Drive file IDs
-GDRIVE_MODEL_ID = "1V8dqxers7VYh88e-bQ2DnUlNZ7JVpSQ9" # ✅ update this after uploading the tf.keras model to Drive
-GDRIVE_STATS_ID = "1Z9gsfEnTCcAn0iT5m2G2lYvUdQO600si"
+# Hugging Face URLs
+MODEL_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.h5"
+STATS_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/label_mean_std.json"
 
-# ========== Safe File Downloader ==========
-def download_file_if_missing(path, file_id):
+# ========== Safe Downloader ==========
+def download_file_if_missing(path, url):
     if not os.path.exists(path):
-        print(f"📥 {path} not found, downloading from Google Drive...")
-        url = f"https://drive.google.com/uc?id={file_id}&confirm=t"
+        print(f"📥 {path} not found, downloading from {url} ...")
         try:
-            output = gdown.download(url, path, quiet=False, fuzzy=True)
-            if output is None or not os.path.exists(path):
-                raise RuntimeError(f"❌ Failed to download: {path}")
-            else:
-                print(f"✅ Downloaded: {path}")
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                with open(path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            print(f"✅ Downloaded: {path}")
         except Exception as e:
-            print(f"❌ gdown download failed for {path}: {e}")
-            raise RuntimeError(f"Download failed for {path}: {e}")
+            print(f"❌ Failed to download {url}: {e}")
+            raise RuntimeError(f"Download failed: {url}")
 
 # ========== Load Model and Normalization Stats ==========
 try:
-    download_file_if_missing(model_path, GDRIVE_MODEL_ID)
-    download_file_if_missing(label_stats_path, GDRIVE_STATS_ID)
+    download_file_if_missing(model_path, MODEL_URL)
+    download_file_if_missing(label_stats_path, STATS_URL)
 
     print(f"Trying to load model from: {model_path} (Exists: {os.path.exists(model_path)})")
     model = tf.keras.models.load_model(model_path)
