@@ -31,7 +31,7 @@ label_stats_path = os.path.join(BASE_DIR, "label_mean_std.json")
 csv_path = os.path.join(BASE_DIR, "nutrition_db.csv")
 
 # Hugging Face URLs
-MODEL_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.h5"
+MODEL_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/final_nutrition_model.keras"
 STATS_URL = "https://huggingface.co/Rathious/NutritionalModel/resolve/main/label_mean_std.json"
 
 # ========== Safe Downloader ==========
