@@ -111,8 +111,8 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-5), loss='huber', metrics=['
 model.fit(train_ds, validation_data=val_ds, epochs=epochs+20, initial_epoch=history.epoch[-1], callbacks=cb)
 
 # ========= Save Model =========
-model.export("final_nutrition_model")  # ✅ Keras 3 SavedModel format
-print("💾 Saved model: final_nutrition_model.keras")
+model.export("final_nutrition_model.h5")  # ✅ h5 SavedModel format
+print("💾 Saved model: final_nutrition_model.h5")
 
 # ========= Evaluate & Export Predictions =========
 print("📊 Generating predictions...")
