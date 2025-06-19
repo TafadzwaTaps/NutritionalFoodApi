@@ -5,6 +5,6 @@ fastapi
 uvicorn
 pandas
 pillow
-python-multipart
+python-3.11.11
 requests
 gdown
