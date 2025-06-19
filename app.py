@@ -8,6 +8,8 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+print(f"TensorFlow version: {tf.__version__}")
+print(f"Keras version: {keras.__version__}")
 # ========== FastAPI App ==========
 app = FastAPI()
 
