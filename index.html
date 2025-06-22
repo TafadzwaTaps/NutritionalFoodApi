@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <title>🍽️ Food Nutrition Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0078d4" />
+  <link rel="manifest" href="manifest.json" />
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
       background: #f4f6f8;
       margin: 0;
-      padding: 40px;
+      padding: 20px;
       display: flex;
       justify-content: center;
     }
@@ -29,11 +32,11 @@
 
     input[type="file"] {
       display: block;
-      margin-top: 20px;
+      margin: 15px auto 10px;
     }
 
     button {
-      margin-top: 10px;
+      margin: 10px 5px 0;
       padding: 10px 20px;
       background-color: #0078d4;
       color: white;
@@ -51,7 +54,8 @@
       max-width: 100%;
       margin-top: 20px;
       border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      display: none;
     }
 
     #result {
@@ -72,8 +76,32 @@
       background-color: #eafaf1;
     }
 
-    h3, h4 {
-      margin-bottom: 5px;
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #0078d4;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 20px;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      input[type="file"] {
+        margin: 10px auto;
+      }
     }
   </style>
 </head>
@@ -81,25 +109,39 @@
   <div class="container">
     <h2>🍽️ Food Nutrition Analyzer</h2>
     <input type="file" id="fileInput" accept="image/*" />
-    <button onclick="uploadImage()">Analyze</button>
+    <div style="text-align:center">
+      <button onclick="uploadImage()">Analyze</button>
+      <button onclick="resetForm()">Reset</button>
+    </div>
 
-    <img id="preview" src="" alt="Image Preview" style="display:none;" />
+    <img id="preview" src="" alt="Image Preview" />
 
     <div id="result"></div>
+    <div id="loader" class="loader" style="display:none;"></div>
   </div>
 
   <script>
+    function resetForm() {
+      document.getElementById("fileInput").value = "";
+      document.getElementById("preview").style.display = "none";
+      document.getElementById("result").innerHTML = "";
+      document.getElementById("loader").style.display = "none";
+    }
+
     async function uploadImage() {
       const fileInput = document.getElementById("fileInput");
       const file = fileInput.files[0];
       const result = document.getElementById("result");
       const preview = document.getElementById("preview");
+      const loader = document.getElementById("loader");
 
       result.className = "";
       result.innerHTML = "";
+      loader.style.display = "block";
 
       if (!file) {
         alert("Please select an image.");
+        loader.style.display = "none";
         return;
       }
 
@@ -111,18 +153,17 @@
       };
       reader.readAsDataURL(file);
 
-      result.innerHTML = "⏳ Analyzing image...";
-
       const formData = new FormData();
       formData.append("file", file);
 
       try {
-        const response = await fetch("http://127.0.0.1:9000/analyze", {
+        const response = await fetch("https://nutritionalfoodapi-c0ye.onrender.com/analyze", {
           method: "POST",
           body: formData
         });
 
         const data = await response.json();
+        loader.style.display = "none";
         console.log("🔍 API Response:", data);
 
         if (!data || data.error || typeof data.calories === "undefined") {
@@ -133,27 +174,29 @@
 
         result.className = "success";
         result.innerHTML = `
-          <h3>✅ Prediction for: ${data.filename}</h3>
-          <ul>
-            <li><strong>Calories:</strong> ${data.calories} kcal</li>
-            <li><strong>Protein:</strong> ${data.protein} g</li>
-            <li><strong>Carbs:</strong> ${data.carbs} g</li>
-            <li><strong>Fats:</strong> ${data.fats} g</li>
-          </ul>
-          ${data.warning ? `<p style="color: #e65100;"><strong>⚠️ ${data.warning}</strong></p>` : ''}
-          ${typeof data.calories_true !== "undefined" ? `
-            <h4>📊 Ground Truth from CSV:</h4>
-            <ul>
-              <li><strong>Calories (True):</strong> ${data.calories_true} kcal</li>
-              <li><strong>Protein (True):</strong> ${data.protein_true} g</li>
-              <li><strong>Carbs (True):</strong> ${data.carbs_true} g</li>
-              <li><strong>Fats (True):</strong> ${data.fats_true} g</li>
-            </ul>` : ''}
+          <h3>✅ Prediction for: <em>${data.filename}</em></h3>
+          <table style="width:100%; border-collapse:collapse;">
+            <tr><th align="left">Nutrient</th><th>Predicted</th>${data.calories_true !== undefined ? "<th>Actual</th>" : ""}</tr>
+            <tr><td>Calories</td><td>${data.calories} kcal</td>${data.calories_true !== undefined ? `<td>${data.calories_true} kcal</td>` : ""}</tr>
+            <tr><td>Protein</td><td>${data.protein} g</td>${data.protein_true !== undefined ? `<td>${data.protein_true} g</td>` : ""}</tr>
+            <tr><td>Carbs</td><td>${data.carbs} g</td>${data.carbs_true !== undefined ? `<td>${data.carbs_true} g</td>` : ""}</tr>
+            <tr><td>Fats</td><td>${data.fats} g</td>${data.fats_true !== undefined ? `<td>${data.fats_true} g</td>` : ""}</tr>
+          </table>
         `;
       } catch (error) {
+        loader.style.display = "none";
         result.className = "error";
         result.innerHTML = `<strong>Request Failed:</strong> ${error.message}`;
       }
+    }
+
+    // ✅ Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log("✅ Service Worker registered:", reg.scope))
+          .catch(err => console.error("❌ Service Worker registration failed:", err));
+      });
     }
   </script>
 </body>
