@@ -172,17 +172,18 @@
           return;
         }
 
-        result.className = "success";
-        result.innerHTML = `
-          <h3>✅ Prediction for: <em>${data.filename}</em></h3>
-          <table style="width:100%; border-collapse:collapse;">
-            <tr><th align="left">Nutrient</th><th>Predicted</th>${data.calories_true !== undefined ? "<th>Actual</th>" : ""}</tr>
-            <tr><td>Calories</td><td>${data.calories} kcal</td>${data.calories_true !== undefined ? `<td>${data.calories_true} kcal</td>` : ""}</tr>
-            <tr><td>Protein</td><td>${data.protein} g</td>${data.protein_true !== undefined ? `<td>${data.protein_true} g</td>` : ""}</tr>
-            <tr><td>Carbs</td><td>${data.carbs} g</td>${data.carbs_true !== undefined ? `<td>${data.carbs_true} g</td>` : ""}</tr>
-            <tr><td>Fats</td><td>${data.fats} g</td>${data.fats_true !== undefined ? `<td>${data.fats_true} g</td>` : ""}</tr>
-          </table>
-        `;
+       result.className = "success";
+result.innerHTML = `
+  <h3>✅ Prediction for: <em>${data.filename}</em></h3>
+  <table style="width:100%; border-collapse:collapse;">
+    <tr><th align="left">Nutrient</th><th>Predicted</th></tr>
+    <tr><td>Calories</td><td>${data.calories} kcal</td></tr>
+    <tr><td>Protein</td><td>${data.protein} g</td></tr>
+    <tr><td>Carbs</td><td>${data.carbs} g</td></tr>
+    <tr><td>Fats</td><td>${data.fats} g</td></tr>
+  </table>
+`;
+
       } catch (error) {
         loader.style.display = "none";
         result.className = "error";
