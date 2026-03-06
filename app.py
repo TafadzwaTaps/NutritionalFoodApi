@@ -91,7 +91,7 @@ def tf_preprocess_image(image_bytes: bytes):
 # ========== Health Check ==========
 @app.get("/")
 def root():
-    return {"message": "✅ Nutrition model API is running on port 9000."}
+    return {"message": "✅ Nutrition model API is running."}
 
 # ========== Analyze Endpoint ==========
 @app.post("/analyze")
